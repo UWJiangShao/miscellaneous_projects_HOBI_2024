@@ -1,0 +1,105 @@
+* Set options;
+options fmtsearch=(fmtlib) mprint mtrace symbolgen mlogic obs=max;
+OPTIONS FULLSTIMER SOURCE SOURCE2 MSGLEVEL=I  NOTES obs=max;
+
+libname out "K:\TX-Data\Special_Projects\2023\Palliative Care\data";
+libname temp "K:\TX-Data\Special_Projects\2023\Palliative Care\data\temp";
+
+
+* Set libnames for input enrollment and encounter datasets;
+libname FFS "K:\TX-Data\Datasets\FFS";
+libname p200 "K:\TX-Data\Datasets\Medicaid";
+libname SP "K:\TX-Data\Datasets\STARPLUS";
+libname CHIP "K:\TX-Data\Datasets\CHIP";
+libname ST "K:\TX-Data\Datasets\STAR";
+libname SH "K:\TX-Data\Datasets\STARHEALTH";
+libname SK "K:\TX-Data\Datasets\STARKIDS";
+
+libname elig odbc noprompt="dsn=INST1_NC;Trusted_connection=yes;database=db_ted_elig;" schema=dbo;
+libname prov odbc noprompt="dsn=INST1_NC;Trusted_connection=yes;database=db_ted_prov;" schema=dbo;
+libname master odbc noprompt="dsn=INST1_NC;Trusted_connection=yes;database=masterdata;" schema=dbo;
+
+
+
+
+
+%macro enr(prg, prgL, yr);
+data enr_&prg._&yr(keep=membno age bthdat age_GRP program months Year first_mon);
+length Age_grp $15;
+set &prg..&prgL._enr_nodual_cy20&yr.;
+first_mon=find(flag, "1");
+age=intck('year',bthdat,intnx('month', mdy(first_mon,15,20&yr.),0,'E'),'C');
+if age>=0;
+if age<21 then Age_GRP="0 to 20 yrs";
+else if 64>=age>=21 then Age_GRP="21 to 64 yrs";
+else Age_GRP="65+ yrs";
+Year=20&yr.;
+run;
+data temp.enr_&prg._&yr;
+merge enr_&prg._&yr(in=in1) Ed_exp_&prg._&yr. INP_exp_&prg._&yr.;
+by membno;
+if in1;
+if ED_exp<=0 then ED_exp=0;
+if INP_exp<=0 then INP_exp=0;
+run;
+
+proc freq data=temp.enr_&prg._&yr;
+tables age Age_GRP/missing;
+title"&PRG CY20&yr. enrollment";
+run;
+title"";
+%mend enr;
+
+%enr(SK,STARKIDS,21);
+%enr(SP,STARPLUS,21);
+%enr(ST,STAR,21);
+
+%enr(SK,STARKIDS,22);
+%enr(SP,STARPLUS,22);
+%enr(ST,STAR,22);
+
+%macro together;
+%do yr= 21 %to 22;
+
+data All_enr_&yr.;
+set temp.enr_sp_&yr. temp.enr_sk_&yr. temp.enr_st_&yr. ;
+run;
+
+proc sort data=All_enr_&yr.;
+by membno ;
+run;
+
+proc summary data=All_enr_&yr.;
+var months ED_exp INP_exp;
+by membno;
+output out=all_months_&yr. sum=;
+run;
+
+data unique_enr_&yr.;
+set All_enr_&yr.;
+by membno;
+if last.membno ;
+keep membno age bthdat age_GRP year first_mon program;
+run;
+
+Data temp.enr_all_&yr.;
+merge unique_enr_&yr.(in=in1) all_months_&yr.;
+by membno;
+
+if months>12 then months=12;
+drop _type_ _freq_;
+run;
+
+proc freq data=temp.enr_all_&yr.;
+tables program months/missing;
+title"enrolled months CY20&yr.";
+run;
+title;
+
+%end;
+
+%mend together;
+
+%together
+
+

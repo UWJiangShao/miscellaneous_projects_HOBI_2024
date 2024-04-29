@@ -1,0 +1,116 @@
+data all_;
+set out.member_level_2021 out.member_level_2022;
+run;
+
+%macro prg_count(prg, prgL);
+proc summary data=all_;
+where upcase(program) in ("&prgL") ;
+var ED_EXP INP_EXP;
+class Age_GRP Year Condition;
+output out=sum_&prg.(rename=(_freq_=N_&prg.)) sum=Ed_exp_&prg INP_exp_&prg;
+run;
+
+data count_&prg.(drop=_type_);
+set sum_&prg.(keep=age_grp Year N_&prg. _type_ Ed_exp_&prg INP_exp_&prg);
+where _type_=6;
+run;
+proc sort data=count_&prg.;
+by age_grp Year;
+run;
+
+Data con_count_&prg.(drop=_type_);
+set sum_&prg.(keep=age_grp Year N_&prg. _type_ condition Ed_exp_&prg INP_exp_&prg);
+where _type_=7 and condition=1;
+run;
+proc sort data=con_count_&prg.;
+by age_grp Year;
+run;
+%mend;
+
+%prg_count(st, STAR)
+%prg_count(sk, STAR KIDS)
+%prg_count(sp, STAR+PLUS)
+
+proc summary data=all_;
+
+var ED_EXP INP_EXP;
+class Age_GRP Year Condition;
+output out=sum_all(rename=(_freq_=N_all)) sum=Ed_exp_all INP_exp_all;
+run;
+
+data count_all(drop=_type_);
+set sum_all(keep=age_grp Year N_all _type_ Ed_exp_all INP_exp_all);
+where _type_=6;
+run;
+proc sort data=count_all;
+by age_grp Year;
+run;
+
+Data Counts;
+merge count_st(drop=ED: INP:) Count_sk(drop=ED: INP:)
+	Count_sp(drop=ED: INP:) Count_all(drop=ED: INP:);
+by age_GRP Year;
+array A(*) N_st N_sk N_SP N_all;
+do i= 1 to dim(A);
+if A(i)=. then A(i)=0;
+end;
+drop i;
+run;
+title"basic count sof members by program year";
+proc print data=counts noobs;
+run;
+
+title;
+
+Data inp;
+merge count_st(drop=ED: N_:) Count_sk(drop=ED: N_:)
+	Count_sp(drop=ED: N_:) Count_all(drop=ED: N_:);
+by age_GRP Year;
+
+run;
+title"INP expenditure of members by program year";
+proc print data=inp noobs;
+run;
+
+title;
+
+Data ED;
+merge count_st(drop=INP: N_:) Count_sk(drop=INP: N_:)
+	Count_sp(drop=INP: N_:) Count_all(drop=INP: N_:);
+by age_GRP Year;
+
+run;
+title"ED expenditure of members by program year";
+proc print data=inp noobs;
+run;
+
+title;
+
+
+/*with conditions*/
+
+data con_count_all(drop=_type_);
+set sum_all(keep=age_grp Year N_all _type_ condition Ed_exp_all INP_exp_all);
+where _type_=7 and condition=1;
+run;
+proc sort data=con_count_all;
+by age_grp Year;
+run;
+
+Data con_counts;
+merge con_count_st(drop=ED: INP:) Con_Count_sk(drop=ED: INP:)
+	Con_Count_sp(drop=ED: INP:) Con_Count_all(drop=ED: INP:);
+by age_GRP Year;
+array A(*) N_st N_sk N_SP N_all;
+do i= 1 to dim(A);
+if A(i)=. then A(i)=0;
+end;
+drop i;
+run;
+title"With SI condition count of members by program year";
+proc print data=con_counts noobs;
+run;
+
+title;
+
+

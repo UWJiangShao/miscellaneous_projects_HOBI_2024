@@ -1,0 +1,74 @@
+
+
+/*** These are teh same as what PPV is using for ED visits */
+%let Ed_rev= '0450' '0451' '0452' '0456' '0459' '0981';
+%let ED_svc= '99281' '99282' '99283' '99284' '99285' 'G0380' 'G0381' 'G0382' 'G0383' 'G0384' 'G0390';
+
+/**** there are revenue codes provided in eXCEL FILE for inpatient */
+
+%let inp_rev = '0100'<=revcod<='0249' or '0360'<=revcod<='0369' or '0680'<=revcod<='0689' or '0700'<=revcod<='0729' or '0800'<=revcod<='0819' ;
+
+%macro exp(prg, prgl, yr);
+Data Ed_INP_&prg._&yr;
+set  &prg..&prgl._enc_cy20&yr.(drop=sxdate: POA:);
+where transtype="I" and (typbill in:('11' '12' '41') or (svccod in (&ed_svc.) or revcod in (&Ed_rev.)));
+if typbill in:('11' '12' '41' '42') then INP=1;
+else if svccod in (&ed_svc.) or revcod in (&Ed_rev.) then ED=1;
+if ED=1 or INP=1;
+/*This is just to check the use of revnue codes*/;
+if &inp_rev. then INP_rev=1;
+
+run;
+
+proc sort data=Ed_INP_&prg._&yr nodupkey out=INP_&prg._&yr;
+where INP=1;
+by membno clmno;
+run;
+
+proc sort data=Ed_INP_&prg._&yr nodupkey out=ED_&prg._&yr;
+where ED=1;
+by membno clmno;
+run;
+
+proc summary data=INP_&prg._&yr;
+var hdr_amtpaid ;
+class membno;
+output out=amt_INP_&prg._&yr sum=INP_EXP;
+run;
+proc sort data=amt_inp_&prg._&yr out=inp_exp_&prg._&yr(drop=_type_ _freq_);
+where membno^='';
+by membno;
+run;
+
+proc summary data=ED_&prg._&yr.;
+var hdr_amtpaid ;
+class membno;
+output out=amt_ED_&prg._&yr. sum=ED_EXP;
+run;
+proc sort data=amt_ED_&prg._&yr out=ed_exp_&prg._&yr(drop=_type_ _freq_);
+where membno^='';
+by membno;
+run;
+
+/*This part is just to check the inp_exp by revnue code small difference */
+
+proc sort data=Ed_INP_&prg._&yr nodupkey out=rev_inp_&prg._&yr;
+where INP_REV=1;
+by membno clmno;
+run;
+
+
+proc summary data= rev_inp_&prg._&yr;
+var hdr_amtpaid;
+class membno;
+output out=rev_INP_&prg._&yr. sum=rev_INP_EXP;
+run;
+
+%mend exp;
+
+%exp(SP, STARPLUS,21)
+%exp(SP,STARPLUS,22)
+%exp(ST,STAR,21)
+%exp(ST, STAR,22)
+%exp(SK,STARKIDS,21)
+%exp(SK,STARKIDS,22);

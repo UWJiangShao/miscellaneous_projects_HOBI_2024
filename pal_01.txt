@@ -1,0 +1,74 @@
+libname fmtlib 'K:\IS-Resources\Resources\SAS Resources\TEXAS\FormatLib';
+
+* Set options;
+options fmtsearch=(fmtlib) mprint mtrace symbolgen mlogic obs=max;
+OPTIONS FULLSTIMER SOURCE SOURCE2 MSGLEVEL=I  NOTES obs=max;
+
+libname out "K:\TX-Data\Special_Projects\2023\Palliative Care\data";
+libname temp "K:\TX-Data\Special_Projects\2023\Palliative Care\data\temp";
+
+
+* Set libnames for input enrollment and encounter datasets;
+libname FFS "K:\TX-Data\Datasets\FFS";
+libname p200 "K:\TX-Data\Datasets\Medicaid";
+libname SP "K:\TX-Data\Datasets\STARPLUS";
+libname CHIP "K:\TX-Data\Datasets\CHIP";
+libname ST "K:\TX-Data\Datasets\STAR";
+libname SH "K:\TX-Data\Datasets\STARHEALTH";
+libname SK "K:\TX-Data\Datasets\STARKIDS";
+
+libname elig odbc noprompt="dsn=INST1_NC;Trusted_connection=yes;database=db_ted_elig;" schema=dbo;
+libname prov odbc noprompt="dsn=INST1_NC;Trusted_connection=yes;database=db_ted_prov;" schema=dbo;
+libname master odbc noprompt="dsn=INST1_NC;Trusted_connection=yes;database=masterdata;" schema=dbo;
+
+* Create libname and input names for enrollment datasets on SQL server;
+%let elig_star=STAR_MD_ENROLLMENT;   
+%let elig_sp=STARPLUS_MD_ENROLLMENT;   
+%let elig_sh=STARHEALTH_PPS_MD_ENROLLMENT;   
+%let elig_ffs=FFS_MD_ENROLLMENT;   
+%let elig_chip=CHIP_REG_ENROLLMENT;
+%let elig_sk=STARKIDS_MD_ENROLLMENT;
+%let elig_htw=HTW_ENROLLMENT;
+
+/* Condition codes copied from code_list.txt */
+
+options validvarname=V7;  *This allow sas to change the variables with space to standard SAS name convention;
+
+%macro condition(D);
+proc import datafile="K:\TX-Data\Special_Projects\2023\Palliative Care\documents\disease_codes_0821.xlsx" 
+            out=&D.  dbms=xlsx replace;
+			getnames=NO;
+			sheet="&D.";
+run;
+%global A_&D.;
+proc sql;
+select quote(strip(A)) into:A_&D. separated by " "
+	from &D.
+	where A^='';
+quit;
+
+%put &&A_&D.;
+
+%mend condition;
+
+%condition(Cancer)
+%condition(heart)
+%condition(renal)
+%condition(stroke)
+%condition(alzheimer)
+%condition(cirrhosis)
+%condition(frailty)
+%condition(lung_failure)
+%condition(neurodegenerative)
+%condition(diabetes_w_complications)
+%condition(diabetes_severe_complications)
+%condition(hiv_aids)
+%condition(dme)
+
+
+options validvarname=any;
+
+
+/*pediatric codes*/
+
+%let P_neuro ='XXXX01', 'XXXX02', 'XXXX03', 'XXXX04', 'XXX05', 'XXX06', 'XXX07', 'XXX08'

@@ -1,0 +1,36 @@
+%macro member(yr);
+
+data Condition&yr;
+set temp.p200_member_condition_&yr 
+	temp.sk_member_condition_&yr
+	temp.sp_member_condition_&yr
+	temp.st_member_condition_&yr ;
+run;
+
+proc summary data= Condition&yr;
+var adult_con ped_con;
+class membno;
+output out=member_con_&yr.(where=(_type_=1)) max=;
+run;
+
+proc sort data=Condition&yr;
+by membno;
+run;
+
+Data out.member_level_20&yr.;
+merge temp.enr_all_&yr.(in=in1) Condition&yr.(in=in2 keep=membno adult_con ped_con);
+by membno;
+if in1;
+if adult_con=1 or (age<21 and ped_con=1) then Condition=1;
+else condition=0;
+run;
+
+proc freq data=out.member_level_20&yr.;
+table program*condition age_GRP*condition/list missing;
+title"condition flag by program and Age Group CY20&yr.";
+run;
+title;
+
+%mend member;
+%member(21)
+%member(22)
